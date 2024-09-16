@@ -8,7 +8,10 @@ using UnityEngine.SceneManagement;
 
 public enum GameState
 {
-
+    GAME_INIT,
+    GAME_COUNTDOWN,
+    GAME_STARTED_PLAYER_MODE,
+    GAME_STARTED_SPECTATOR_MODE,
 }
 
 public class GameController : MonoBehaviour
@@ -45,6 +48,7 @@ public class GameController : MonoBehaviour
             }
             _camera.Follow = _cars[_focusIndex].transform;
             _camera.LookAt = _cars[_focusIndex].transform;
+            GameUIController.Instance.carSessionData = _cars[_focusIndex].sessionData;
         }
     }
 
@@ -52,8 +56,9 @@ public class GameController : MonoBehaviour
     private PlayerInput _playerInput;
     private InputAction _actionSelectPrev;
     private InputAction _actionSelectNext;
+    public GameState gameState { get; private set; }
 
-    private float _startTime;
+    public float startTime { get; private set; }
     private int _countDown;
 
     private List<CarController> _cars;
@@ -126,9 +131,7 @@ public class GameController : MonoBehaviour
         _cars = new List<CarController>();
         for (int i = 0; i < _vehicleStartingLocations.Length; ++i)
         {
-            Vector3 position = _vehicleStartingLocations[i].position;
-            bool isPlayer = !GlobalDataManager.Instance.spectatorMode && i == _vehicleStartingLocations.Length - 1;
-            _cars.Add(createNewCar(position, i));
+            _cars.Add(createNewCar(_vehicleStartingLocations[i].position, i));
         }
 
         if (GlobalDataManager.Instance.spectatorMode)
@@ -148,10 +151,8 @@ public class GameController : MonoBehaviour
 
             focusIndex = playerIndex;
         }
-        GameUIController.Instance.enabled = true;
-        _startTime = Time.time;
-        _countDown = 3;
-        GameUIController.Instance.SetCountdown(_countDown);
+
+        gameState = GameState.GAME_INIT;
     }
 
     void Update()
@@ -161,38 +162,69 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        if (_countDown > 0 && Time.time - _startTime > 1)
+        switch (gameState)
         {
-            --_countDown;
-            _startTime = Time.time;
-            GameUIController.Instance.SetCountdown(_countDown);
-            if (_countDown == 0)
-            {
-                foreach (CarController car in _cars)
+            case GameState.GAME_INIT:
+                if (_cars.TrueForAll(c => c.sessionData != null))
                 {
-                    car.NextCheckpoint(_checkpoints[0]);
-                    car.enabled = true;
+                    GameUIController.Instance.enabled = true;
+                    startTime = Time.time;
+                    _countDown = 3;
+                    GameUIController.Instance.SetCountdown(_countDown);
+                    gameState = GameState.GAME_COUNTDOWN;
                 }
-            }
-        }
+                break;
 
-        if (GlobalDataManager.Instance.spectatorMode)
-        {
-            if (_actionSelectNext.triggered)
-            {
-                focusIndex = (focusIndex + 1) % _cars.Count;
-            }
-            if (_actionSelectPrev.triggered)
-            {
-                focusIndex = (focusIndex + _cars.Count - 1) % _cars.Count;
-            }
-        }
-        else
-        {
-            if (playerCar.sessionData.lapCounter >= maxLapCount)
-            {
-                GameUIController.Instance.ShowGameOverMessageBox();
-            }
+            case GameState.GAME_COUNTDOWN:
+                if (Time.time - startTime > 1)
+                {
+                    --_countDown;
+                    if (_countDown == 0)
+                    {
+                        foreach (CarController car in _cars)
+                        {
+                            car.NextCheckpoint(_checkpoints[0]);
+                            car.enabled = true;
+                        }
+                        if (GlobalDataManager.Instance.spectatorMode)
+                        {
+                            gameState = GameState.GAME_STARTED_SPECTATOR_MODE;
+                        }
+                        else
+                        {
+                            gameState = GameState.GAME_STARTED_PLAYER_MODE;
+                        }
+                        GameUIController.Instance.StartTimerDisplay();
+                    }
+                    startTime = Time.time;
+                    GameUIController.Instance.SetCountdown(_countDown);
+                }
+                break;
+
+            case GameState.GAME_STARTED_PLAYER_MODE:
+                if (playerCar.sessionData.lapCounter >= maxLapCount)
+                {
+                    GameUIController.Instance.ShowGameOverMessageBoxAsPlayer();
+                }
+                break;
+
+            case GameState.GAME_STARTED_SPECTATOR_MODE:
+                if (_actionSelectNext.triggered)
+                {
+                    focusIndex = (focusIndex + 1) % _cars.Count;
+                }
+                if (_actionSelectPrev.triggered)
+                {
+                    focusIndex = (focusIndex + _cars.Count - 1) % _cars.Count;
+                }
+                if (_cars.TrueForAll(c => c.sessionData.lapCounter >= maxLapCount))
+                {
+                    GameUIController.Instance.ShowGameOverMessageBoxAsPlayer();
+                }
+                break;
+
+            default:
+                break;
         }
     }
 

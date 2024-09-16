@@ -37,31 +37,42 @@ public class GameUIController : BaseUIController
         "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"
     };
 
-    private float _lastUpdateTime;
-    private bool _sessionDataUIEnabled;
+    private float _timerStartTime;
+
+    private CarSessionData _carSessionData;
+    public CarSessionData carSessionData
+    {
+        get => _carSessionData;
+        set
+        {
+            if (_carSessionData != value)
+            {
+                if (_carSessionData != null)
+                {
+                    _carSessionData.updateAction -= onStatUpdate;
+                }
+                _carSessionData = value;
+                if (_carSessionData != null)
+                {
+                    _carSessionData.updateAction += onStatUpdate;
+                    onStatUpdate();
+                }
+            }
+        }
+    }
 
     protected override void Awake()
     {
         base.Awake();
         Instance = this;
+        _carSessionData = null;
+
     }
 
     private void OnEnable()
     {
         _panelPlayerCommands.gameObject.SetActive(!GlobalDataManager.Instance.spectatorMode);
         _panelSpectateCommands.gameObject.SetActive(GlobalDataManager.Instance.spectatorMode);
-        _sessionDataUIEnabled = false;
-        GameController.Instance.playerCar.sessionData.updateAction += onStatUpdate;
-        onStatUpdate();
-        _lastUpdateTime = Time.time;
-    }
-
-    private void OnDisable()
-    {
-        if (_sessionDataUIEnabled)
-        {
-            GameController.Instance.playerCar.sessionData.updateAction -= onStatUpdate;
-        }
     }
 
     public void SetCountdown(int countdown)
@@ -78,49 +89,47 @@ public class GameUIController : BaseUIController
         _panelMenu.gameObject.SetActive(!_panelMenu.gameObject.activeInHierarchy);
     }
 
-    protected override void Update()
+    public void StartTimerDisplay()
     {
-        base.Update();
-
-        if (!_sessionDataUIEnabled && GameController.Instance.playerCar.sessionData != null)
-        {
-            _sessionDataUIEnabled = true;
-            GameController.Instance.playerCar.sessionData.updateAction += onStatUpdate;
-        }
-
-        if (_sessionDataUIEnabled)
-        {
-            float timeNow = Time.time;
-            float startTime = GameController.Instance.playerCar.sessionData.startTime;
-            if (startTime != float.MaxValue && timeNow - _lastUpdateTime > 0.01f)
-            {
-                TimeSpan timeSpan = TimeSpan.FromSeconds(timeNow - startTime);
-                _labelTimer.text = string.Format(
-                    "{0}:{1:00}.{2:000}",
-                    timeSpan.Minutes,
-                    timeSpan.Seconds,
-                    timeSpan.Milliseconds);
-                _lastUpdateTime = timeNow;
-            }
-
-            _labelRank.text = string.Format(
-                "{0} Place", _rankLabel[GameController.Instance.playerCar.sessionData.rank]);
-        }
+        _timerStartTime = Time.time;
+        InvokeRepeating(nameof(updateTimerDisplay), 0, 0.01f);
     }
+
+    private void updateTimerDisplay()
+    {
+        TimeSpan timeSpan = TimeSpan.FromSeconds(Time.time - _timerStartTime);
+        _labelTimer.text = string.Format(
+            "{0}:{1:00}.{2:000}",
+            timeSpan.Minutes,
+            timeSpan.Seconds,
+            timeSpan.Milliseconds);
+    }
+
     private void onStatUpdate()
     {
         _labelLapCounter.text = string.Format(
             "Lap {0} / {1}",
-            GameController.Instance.playerCar.sessionData.lapCounter + 1,
+            carSessionData.lapCounter + 1,
             GameController.Instance.maxLapCount);
+        _labelRank.text = string.Format(
+            "{0} Place", _rankLabel[carSessionData.rank]);
     }
 
-    public void ShowGameOverMessageBox()
+    public void ShowGameOverMessageBoxAsPlayer()
     {
+        CancelInvoke(nameof(updateTimerDisplay));
         string message = string.Format(
             "Congratulations! You've finished in {0} place!",
             _rankLabel[GameController.Instance.playerCar.sessionData.rank]);
         _panelMenu.message = message;
+        _panelMenu.enableCancel = false;
+        _panelMenu.gameObject.SetActive(true);
+    }
+
+    public void ShowGameOverMessageBox()
+    {
+        CancelInvoke(nameof(updateTimerDisplay));
+        _panelMenu.message = "Game Over!";
         _panelMenu.enableCancel = false;
         _panelMenu.gameObject.SetActive(true);
     }

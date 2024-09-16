@@ -2062,8 +2062,8 @@ MonoBehaviour:
   _labelTimer: {fileID: 770518233}
   _labelRank: {fileID: 922833104}
   _panelMenu: {fileID: 1556649886}
-  _panelPlayerCommands: {fileID: 0}
-  _panelSpectateCommands: {fileID: 0}
+  _panelPlayerCommands: {fileID: 1259248463}
+  _panelSpectateCommands: {fileID: 1901204526}
 --- !u!114 &560220877
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7635,9 +7635,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _prefabCar: {fileID: 2041904345}
   _camera: {fileID: 522524953}
-  _vehicleStartingLocations: []
+  _vehicleStartingLocations:
+  - {fileID: 476975786}
+  - {fileID: 919503957}
+  - {fileID: 1552313932}
+  - {fileID: 62334248}
   _originalPaintMaterial: {fileID: 2100000, guid: 413ef5252741bb2498f457456da14443, type: 2}
-  <maxLapCount>k__BackingField: 1
+  <maxLapCount>k__BackingField: 3
 --- !u!114 &2041221053
 MonoBehaviour:
   m_ObjectHideFlags: 0
